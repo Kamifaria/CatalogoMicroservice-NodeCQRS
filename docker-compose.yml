@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # ======== MONGODB ========
+  mongodb:
+    image: mongo:6
+    container_name: catalogo_mongodb
+    ports:
+      - "27017:27017" # Porta principal
+    environment:
+      MONGO_INITDB_DATABASE: catalogo
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - microsservicos
+
+  # ======== REDIS ========
+  redis:
+    image: redis:7-alpine
+    container_name: catalogo_redis
+    ports:
+      - "6379:6379" # Porta de cache para leituras rápidas
+    networks:
+      - microsservicos
+
+  # ======== RABBITMQ ========
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: catalogo_rabbitmq
+    ports:
+      - "5672:5672" # Transporte da Mensageria (AMQP)
+      - "15672:15672" # Painel Management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - microsservicos
+
+  # ======== API NODE.JS ========
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: catalogo_api
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - MONGODB_URI=mongodb://mongodb:27017/catalogo
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+    networks:
+      - microsservicos
+    restart: on-failure
+
+networks:
+  microsservicos:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
